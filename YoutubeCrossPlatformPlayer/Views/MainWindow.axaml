@@ -17,7 +17,7 @@
 
     <Panel VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="30, 30,30,30">
         <TextBox Text="{Binding SearchText}" HorizontalAlignment="Stretch" VerticalAlignment="Top"> </TextBox>
-        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Command="{Binding SearchCommand}">
+        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Command="{Binding DoSearch}">
             Поиск
         </Button>
         <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowProgressBar}" HorizontalAlignment="Stretch"
@@ -33,15 +33,12 @@
         <!--                Margin="0,0,250,0"> -->
         <!--     </TextBlock> -->
         <!-- </Panel> -->
-        
+
         <ListBox Items="{Binding VideoSearchResults}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                 Margin="0,50,0,0"
-                 Background="Transparent">
+                 Margin="0,50,0,30" Background="Transparent" SelectedIndex="{Binding SelectedVideoID}">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Panel>
-                        <Button VerticalAlignment="Stretch" HorizontalAlignment="Right"> Воспроизвести </Button>
-                        <Button VerticalAlignment="Stretch" HorizontalAlignment="Right" Margin="0,0,130,0"> Скачать </Button>
+                    <Panel Height="40">
                         <TextBlock Text="{Binding Title}" VerticalAlignment="Top"></TextBlock>
                         <TextBlock Text="{Binding Author}" VerticalAlignment="Bottom" HorizontalAlignment="Left"></TextBlock>
                         <TextBlock Text="{Binding Duration}" VerticalAlignment="Bottom" HorizontalAlignment="Right"
@@ -51,7 +48,23 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+
+        <Button VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Play}"> Воспроизвести </Button>
+        <Button VerticalAlignment="Bottom" HorizontalAlignment="Left"> Скачать </Button>
+
+        <Expander Header="{Binding CurrentVideoInfo.Length}" ExpandDirection="Up"
+                  VerticalAlignment="Bottom" HorizontalAlignment="Right" Padding="0,0,100,0">
+            <ListBox Items="{Binding CurrentVideoInfo}" SelectedIndex="{Binding selectedVideoQuality}"
+                     HorizontalAlignment="Stretch">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Panel>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                            </TextBlock>
+                        </Panel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Expander>
     </Panel>
-
-
 </Window>

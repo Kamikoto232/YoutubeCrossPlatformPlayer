@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using System.Reactive;
+using System.Diagnostics;
+using System.Linq;
 using ReactiveUI;
 using YoutubeExplode;
 using YoutubeExplode.Search;
+using YoutubeExplode.Videos.Streams;
 
 namespace YoutubeCrossPlatformPlayer.ViewModels
 {
@@ -14,6 +16,25 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
         private static string? searchText;
         private ObservableCollection<VideoSearchResult>? videoSearchResults;
         private const uint maxResults = 100;
+        private int selectedVideoID;
+        private MuxedStreamInfo[] currentVideoInfo;
+        private int selectedVideoQuality { get; set; }
+
+        public int SelectedVideoID
+        {
+            get => selectedVideoID;
+            set
+            {
+                selectedVideoID = value;
+                UpdateSelection();
+            }
+        }
+
+        public MuxedStreamInfo[] CurrentVideoInfo
+        {
+            get => currentVideoInfo;
+            set => this.RaiseAndSetIfChanged(ref currentVideoInfo, value);
+        }
 
         public bool ShowProgressBar
         {
@@ -27,7 +48,6 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             set => searchText = value;
         }
 
-        public ReactiveCommand<Unit, Unit> SearchCommand { get; set; }
 
         public ObservableCollection<VideoSearchResult>? VideoSearchResults
         {
@@ -37,11 +57,10 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
 
         public MainWindowViewModel()
         {
-            SearchCommand = ReactiveCommand.Create(DoSearch);
             youtube = new YoutubeClient();
         }
 
-        private async void DoSearch()
+        public async void DoSearch()
         {
             var searchPhrase = SearchText;
             VideoSearchResults?.Clear();
@@ -53,7 +72,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             await foreach (ISearchResult result in youtube.Search.GetResultsAsync(searchPhrase))
             {
                 if (VideoSearchResults.Count > maxResults) break;
-                // Use pattern matching to handle different results (videos, playlists, channels)
+
                 switch (result)
                 {
                     case VideoSearchResult video:
@@ -77,9 +96,49 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
 
                 Console.Write("Searching... end ");
 
-
                 ShowProgressBar = false;
             }
+        }
+
+        private async void UpdateSelection()
+        {
+            if (videoSearchResults == null || selectedVideoID < 0 || selectedVideoID > videoSearchResults?.Count) return;
+            try
+            {
+                var streamManifest = await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID].Url);
+                CurrentVideoInfo = streamManifest.GetMuxedStreams().ToArray();
+                selectedVideoQuality = 0;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                CurrentVideoInfo = Array.Empty<MuxedStreamInfo>();
+            }
+            
+        }
+        
+        public void Play()
+        {
+            if (videoSearchResults == null) return;
+            try
+            {
+                var streamInfo = CurrentVideoInfo[selectedVideoQuality];
+            
+                var process = new Process
+                {
+                    StartInfo =
+                    {
+                        FileName = @"C:\Program Files\VideoLAN\VLC\vlc.exe",
+                        Arguments = streamInfo.Url
+                    }
+                };
+                process.Start();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+            
         }
     }
 }
