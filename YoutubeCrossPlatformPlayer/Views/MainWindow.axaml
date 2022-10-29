@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:YoutubeCrossPlatformPlayer.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="YoutubeCrossPlatformPlayer.Views.MainWindow"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Youtube Player"
+        Background="Transparent"
+        TransparencyLevelHint="Blur"
+        ExtendClientAreaToDecorationsHint="True">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <Panel VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="30, 30,30,30">
+        <TextBox Text="{Binding SearchText}" HorizontalAlignment="Stretch" VerticalAlignment="Top"> </TextBox>
+        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Command="{Binding SearchCommand}">
+            Поиск
+        </Button>
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowProgressBar}" HorizontalAlignment="Stretch"
+                     VerticalAlignment="Top" Margin="0,33,0,0">
+        </ProgressBar>
+
+        <!-- <Panel Height="30"> -->
+        <!--     <Button VerticalAlignment="Stretch" HorizontalAlignment="Right"> Воспроизвести </Button> -->
+        <!--     <Button VerticalAlignment="Stretch" HorizontalAlignment="Right" Margin="0,0,130,0"> Скачать </Button> -->
+        <!--     <TextBlock Text="NAME NAMENAMENAMENAMENAME" VerticalAlignment="Top"></TextBlock> -->
+        <!--     <TextBlock Text="Author" VerticalAlignment="Bottom" HorizontalAlignment="Left"></TextBlock> -->
+        <!--     <TextBlock Text="00:00:10" VerticalAlignment="Bottom" HorizontalAlignment="Right" -->
+        <!--                Margin="0,0,250,0"> -->
+        <!--     </TextBlock> -->
+        <!-- </Panel> -->
+        
+        <ListBox Items="{Binding VideoSearchResults}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                 Margin="0,50,0,0"
+                 Background="Transparent">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Panel>
+                        <Button VerticalAlignment="Stretch" HorizontalAlignment="Right"> Воспроизвести </Button>
+                        <Button VerticalAlignment="Stretch" HorizontalAlignment="Right" Margin="0,0,130,0"> Скачать </Button>
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Top"></TextBlock>
+                        <TextBlock Text="{Binding Author}" VerticalAlignment="Bottom" HorizontalAlignment="Left"></TextBlock>
+                        <TextBlock Text="{Binding Duration}" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                                   Margin="0,0,250,0">
+                        </TextBlock>
+                    </Panel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Panel>
+
+
+</Window>
