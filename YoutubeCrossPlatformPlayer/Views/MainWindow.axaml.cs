@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia;
 
 namespace YoutubeCrossPlatformPlayer.Views
 {
@@ -7,6 +8,9 @@ namespace YoutubeCrossPlatformPlayer.Views
         public MainWindow()
         {
             InitializeComponent();
+#if DEBUG
+        this.AttachDevTools();
+#endif
         }
     }
 }

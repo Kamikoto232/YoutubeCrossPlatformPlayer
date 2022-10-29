@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net;
+using Avalonia.Media.Imaging;
 using ReactiveUI;
 using YoutubeExplode;
 using YoutubeExplode.Search;
@@ -13,12 +16,20 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
     {
         private readonly YoutubeClient youtube;
         private bool showProgressBar;
+        private bool allInQueue;
         private static string? searchText;
-        private ObservableCollection<VideoSearchResult>? videoSearchResults;
+        private ObservableCollection<VideoData>? videoSearchResults;
         private const uint maxResults = 100;
         private int selectedVideoID;
-        private MuxedStreamInfo[] currentVideoInfo;
+        private MuxedStreamInfo[] currentVideoStreamInfos;
         private int selectedVideoQuality { get; set; }
+        private string playerPath = "";
+
+        public string PlayerPath
+        {
+            get => playerPath;
+            set => this.RaiseAndSetIfChanged(ref playerPath, value);
+        }
 
         public int SelectedVideoID
         {
@@ -30,10 +41,10 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             }
         }
 
-        public MuxedStreamInfo[] CurrentVideoInfo
+        public MuxedStreamInfo[] CurrentVideoStreamInfos
         {
-            get => currentVideoInfo;
-            set => this.RaiseAndSetIfChanged(ref currentVideoInfo, value);
+            get => currentVideoStreamInfos;
+            set => this.RaiseAndSetIfChanged(ref currentVideoStreamInfos, value);
         }
 
         public bool ShowProgressBar
@@ -49,7 +60,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
         }
 
 
-        public ObservableCollection<VideoSearchResult>? VideoSearchResults
+        public ObservableCollection<VideoData>? VideoSearchResults
         {
             get => videoSearchResults;
             set => this.RaiseAndSetIfChanged(ref videoSearchResults, value);
@@ -64,10 +75,9 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
         {
             var searchPhrase = SearchText;
             VideoSearchResults?.Clear();
-            VideoSearchResults = new ObservableCollection<VideoSearchResult>();
+            VideoSearchResults = new ObservableCollection<VideoData>();
 
             ShowProgressBar = true;
-            Console.Write("Searching... " + searchPhrase);
 
             await foreach (ISearchResult result in youtube.Search.GetResultsAsync(searchPhrase))
             {
@@ -77,7 +87,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                 {
                     case VideoSearchResult video:
                     {
-                        VideoSearchResults.Add(video);
+                        VideoSearchResults.Add(new VideoData(video, this));
                         break;
                     }
                     case PlaylistSearchResult playlist:
@@ -94,42 +104,57 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                     }
                 }
 
-                Console.Write("Searching... end ");
-
                 ShowProgressBar = false;
             }
         }
 
         private async void UpdateSelection()
         {
-            if (videoSearchResults == null || selectedVideoID < 0 || selectedVideoID > videoSearchResults?.Count) return;
+            if (videoSearchResults == null || selectedVideoID < 0 ||
+                selectedVideoID > videoSearchResults?.Count) return;
             try
             {
-                var streamManifest = await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID].Url);
-                CurrentVideoInfo = streamManifest.GetMuxedStreams().ToArray();
+                var streamManifest =
+                    await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID].SearchResult.Url);
+                CurrentVideoStreamInfos = streamManifest.GetMuxedStreams().ToArray();
                 selectedVideoQuality = 0;
             }
             catch (Exception e)
             {
                 Console.WriteLine(e);
-                CurrentVideoInfo = Array.Empty<MuxedStreamInfo>();
+                CurrentVideoStreamInfos = Array.Empty<MuxedStreamInfo>();
             }
-            
         }
-        
-        public void Play()
+
+        public async void Play()
         {
             if (videoSearchResults == null) return;
             try
             {
-                var streamInfo = CurrentVideoInfo[selectedVideoQuality];
-            
+                string urls = "";
+
+                if (allInQueue)
+                {
+                    for (int i = selectedVideoID; i < videoSearchResults.Count; i++)
+                    {
+                        var streamManifest =
+                            await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID]
+                                .SearchResult.Url);
+                        var videoStreamInfoInfo = streamManifest.GetMuxedStreams().ToArray()[selectedVideoQuality];
+                        urls += videoStreamInfoInfo.Url + " ";
+                    }
+                }
+                else
+                {
+                    urls = CurrentVideoStreamInfos[selectedVideoQuality].Url;
+                }
+
                 var process = new Process
                 {
                     StartInfo =
                     {
-                        FileName = @"C:\Program Files\VideoLAN\VLC\vlc.exe",
-                        Arguments = streamInfo.Url
+                        FileName = playerPath,
+                        Arguments = urls
                     }
                 };
                 process.Start();
@@ -138,7 +163,51 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             {
                 Console.WriteLine(e);
             }
-            
+        }
+
+        public class VideoData
+        {
+            public VideoSearchResult SearchResult { get; set; }
+            private readonly MainWindowViewModel model;
+            private Avalonia.Media.Imaging.Bitmap preview = null;
+
+            public Avalonia.Media.Imaging.Bitmap Preview
+            {
+                get => preview;
+                set => model.RaiseAndSetIfChanged(ref preview, value);
+            }
+
+            public VideoData(VideoSearchResult searchResult, MainWindowViewModel model)
+            {
+                SearchResult = searchResult;
+                this.model = model;
+                DownloadImage(SearchResult.Thumbnails[2].Url);
+            }
+
+            public void DownloadImage(string url)
+            {
+                using (WebClient client = new WebClient())
+                {
+                    client.DownloadDataAsync(new Uri(url));
+                    client.DownloadDataCompleted += DownloadComplete;
+                }
+            }
+
+            private void DownloadComplete(object sender, DownloadDataCompletedEventArgs e)
+            {
+                try
+                {
+                    byte[] bytes = e.Result;
+
+                    Stream stream = new MemoryStream(bytes);
+                    preview = Bitmap.DecodeToWidth(stream, 300);
+                }
+                catch (Exception ex)
+                {
+                    preview = null; // Could not download...
+                    throw;
+                }
+            }
         }
     }
 }
