@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
-using Avalonia.Media.Imaging;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Avalonia.Controls;
 using ReactiveUI;
 using YoutubeExplode;
 using YoutubeExplode.Search;
@@ -16,12 +18,15 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
     {
         private readonly YoutubeClient youtube;
         private bool showProgressBar;
-        private bool allInQueue;
+        private bool showDownloadProgressBar;
+        private bool allInQueue { get; set; }
         private static string? searchText;
         private ObservableCollection<VideoData>? videoSearchResults;
         private const uint maxResults = 100;
         private int selectedVideoID;
         private MuxedStreamInfo[] currentVideoStreamInfos;
+        private DownloadVideoInfo downloadVideoInfo { get; set; } = new DownloadVideoInfo();
+        
         private int selectedVideoQuality { get; set; }
         private string playerPath = "";
 
@@ -53,12 +58,17 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             set => this.RaiseAndSetIfChanged(ref showProgressBar, value);
         }
 
+        public bool ShowDownloadProgressBar
+        {
+            get => showDownloadProgressBar;
+            set => this.RaiseAndSetIfChanged(ref showDownloadProgressBar, value);
+        }
+
         public static string? SearchText
         {
             get => searchText;
             set => searchText = value;
         }
-
 
         public ObservableCollection<VideoData>? VideoSearchResults
         {
@@ -87,7 +97,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                 {
                     case VideoSearchResult video:
                     {
-                        VideoSearchResults.Add(new VideoData(video, this));
+                        VideoSearchResults.Add(new VideoData(video));
                         break;
                     }
                     case PlaylistSearchResult playlist:
@@ -137,11 +147,18 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                 {
                     for (int i = selectedVideoID; i < videoSearchResults.Count; i++)
                     {
-                        var streamManifest =
-                            await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID]
-                                .SearchResult.Url);
-                        var videoStreamInfoInfo = streamManifest.GetMuxedStreams().ToArray()[selectedVideoQuality];
-                        urls += videoStreamInfoInfo.Url + " ";
+                        try
+                        {
+                            var streamManifest =
+                                await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID]
+                                    .SearchResult.Url);
+                            var videoStreamInfoInfo = streamManifest.GetMuxedStreams().ToArray()[selectedVideoQuality];
+                            urls += videoStreamInfoInfo.Url + " ";
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e);
+                        }
                     }
                 }
                 else
@@ -165,48 +182,77 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             }
         }
 
-        public class VideoData
+        public async void Save()
+        {
+            if (videoSearchResults == null) return;
+
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.Filters = new List<FileDialogFilter>();
+            var filter = new FileDialogFilter();
+            filter.Extensions.Add(CurrentVideoStreamInfos[selectedVideoQuality].Container.Name);
+            saveFileDialog.Filters.Add(filter);
+
+            var path = await saveFileDialog.ShowAsync(new Window());
+            //path += "."+CurrentVideoStreamInfos[selectedVideoQuality].Container.Name;
+            if (string.IsNullOrEmpty(path)) return;
+            await Task.Run(()=>DownloadTask(path, CurrentVideoStreamInfos[selectedVideoQuality].Url));
+        }
+
+        private async void DownloadTask(string path, string url)
+        {
+            downloadVideoInfo.Downloading = true;
+           
+            using (var httpClient = new HttpClient())
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    using (Stream contentStream =
+                           await (await httpClient.SendAsync(request)).Content.ReadAsStreamAsync(),
+                           stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+                    {
+                        downloadVideoInfo.TotalBytes = stream.Length;
+                        downloadVideoInfo.CurrentBytes = stream.Position;
+
+                        await contentStream.CopyToAsync(stream);
+                    }
+                }
+            }
+            
+            downloadVideoInfo.Downloading = false;
+        }
+
+        public class DownloadVideoInfo : ViewModelBase
+        {
+            public bool downloading;
+            public long totalBytes;
+            public long currentBytes;
+
+            public bool Downloading
+            {
+                get => downloading;
+                set => this.RaiseAndSetIfChanged(ref downloading, value);
+            }
+            public long TotalBytes
+            {
+                get => totalBytes;
+                set => this.RaiseAndSetIfChanged(ref totalBytes, value);
+            }
+            public long CurrentBytes
+            {
+                get => currentBytes;
+                set => this.RaiseAndSetIfChanged(ref currentBytes, value);
+            }
+        }
+
+        public class VideoData : ViewModelBase
         {
             public VideoSearchResult SearchResult { get; set; }
-            private readonly MainWindowViewModel model;
-            private Avalonia.Media.Imaging.Bitmap preview = null;
+            private string previewUrl { get; set; }
 
-            public Avalonia.Media.Imaging.Bitmap Preview
-            {
-                get => preview;
-                set => model.RaiseAndSetIfChanged(ref preview, value);
-            }
-
-            public VideoData(VideoSearchResult searchResult, MainWindowViewModel model)
+            public VideoData(VideoSearchResult searchResult)
             {
                 SearchResult = searchResult;
-                this.model = model;
-                DownloadImage(SearchResult.Thumbnails[2].Url);
-            }
-
-            public void DownloadImage(string url)
-            {
-                using (WebClient client = new WebClient())
-                {
-                    client.DownloadDataAsync(new Uri(url));
-                    client.DownloadDataCompleted += DownloadComplete;
-                }
-            }
-
-            private void DownloadComplete(object sender, DownloadDataCompletedEventArgs e)
-            {
-                try
-                {
-                    byte[] bytes = e.Result;
-
-                    Stream stream = new MemoryStream(bytes);
-                    preview = Bitmap.DecodeToWidth(stream, 300);
-                }
-                catch (Exception ex)
-                {
-                    preview = null; // Could not download...
-                    throw;
-                }
+                previewUrl = (SearchResult.Thumbnails[2].Url);
             }
         }
     }

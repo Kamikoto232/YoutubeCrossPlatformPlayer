@@ -3,6 +3,7 @@
         xmlns:vm="using:YoutubeCrossPlatformPlayer.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="YoutubeCrossPlatformPlayer.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
@@ -15,30 +16,40 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Panel VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="30, 30,30,30">
-        <TextBox Text="{Binding SearchText}" HorizontalAlignment="Stretch" VerticalAlignment="Top"> </TextBox>
-        <Button HorizontalAlignment="Right" VerticalAlignment="Top" Command="{Binding DoSearch}">
-            Поиск
-        </Button>
+    <Panel VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10,30,10,30">
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+            <TextBlock VerticalAlignment="Top">YouTube
+            Player</TextBlock>
+
+            <TextBox Text="{Binding SearchText}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Width="500"> </TextBox>
+            <Button HorizontalAlignment="Stretch" VerticalAlignment="Top" Command="{Binding DoSearch}">
+                Поиск
+            </Button>
+        </StackPanel>
+
         <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowProgressBar}" HorizontalAlignment="Stretch"
                      VerticalAlignment="Top" Margin="0,33,0,0">
         </ProgressBar>
 
-        <ListBox Items="{Binding VideoSearchResults}" HorizontalAlignment="Stretch"
+        <ListBox Items="{Binding VideoSearchResults}" HorizontalAlignment="Center"
                  VerticalAlignment="Stretch"
                  Margin="0,50,0,40" Background="Transparent" SelectedIndex="{Binding SelectedVideoID}">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Grid RowDefinitions="Auto * Auto" Height="150" Width="200">
-                        <TextBlock Grid.Row="0" Text="{Binding SearchResult.Title}" VerticalAlignment="Top"></TextBlock>
-                        <Image Grid.Row="1" Source="{Binding Preview}" HorizontalAlignment="Stretch"> </Image>
-                        <TextBlock Grid.Row="2" Text="{Binding SearchResult.Author}" VerticalAlignment="Bottom"
+                    <Panel Height="200" Width="260">
+                        <ToolTip.Tip>
+                            <UserControl Content="{Binding SearchResult.Title}" MaxHeight="1000" />
+                        </ToolTip.Tip>
+                        <Image asyncImageLoader:ImageLoader.Source="{Binding previewUrl}" HorizontalAlignment="Stretch"> </Image>
+                        <TextBlock Text="{Binding SearchResult.Title}" VerticalAlignment="Top"></TextBlock>
+                        <TextBlock Text="{Binding SearchResult.Author}" VerticalAlignment="Bottom"
                                    HorizontalAlignment="Left">
                         </TextBlock>
-                        <TextBlock Grid.Row="2" Text="{Binding SearchResult.Duration}" VerticalAlignment="Bottom"
+                        <TextBlock Text="{Binding SearchResult.Duration}" VerticalAlignment="Bottom"
                                    HorizontalAlignment="Right">
                         </TextBlock>
-                    </Grid>
+                    </Panel>
                 </DataTemplate>
             </ListBox.ItemTemplate>
 
@@ -51,14 +62,13 @@
 
         <StackPanel VerticalAlignment="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
             <TextBox Text="{Binding PlayerPath}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Width="200"> </TextBox>
+            <Button IsEnabled="{Binding !downloadVideoInfo.Downloading}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Save}"> Скачать </Button>
             <Button VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Play}"> Воспроизвести </Button>
-           
-            <!-- TODO bind bool allInQueue -->
-            <ToggleSwitch> Все в очередь </ToggleSwitch> 
             
+            <ToggleSwitch IsChecked="{Binding allInQueue}" Height="50" VerticalAlignment="Bottom"> Все в очередь </ToggleSwitch>
 
-            <Expander Header="{Binding CurrentVideoStreamInfos.Length}" ExpandDirection="Up" HorizontalAlignment="Right"
-                      Padding="0,0,100,0">
+            <Expander Header="{Binding CurrentVideoStreamInfos.Length}" ExpandDirection="Up"
+                      HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="0,0,50,0">
                 <ListBox Items="{Binding CurrentVideoStreamInfos}" SelectedIndex="{Binding selectedVideoQuality}"
                          HorizontalAlignment="Stretch">
                     <ListBox.ItemTemplate>
@@ -71,8 +81,12 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </Expander>
+            
         </StackPanel>
-
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding downloadVideoInfo.Downloading}" HorizontalAlignment="Stretch"
+                     VerticalAlignment="Bottom" Margin="0,11,0,-11" Maximum="{Binding downloadVideoInfo.TotalBytes}"
+                     Value="{Binding downloadVideoInfo.CurrentBytes}">
+        </ProgressBar>
 
     </Panel>
 
