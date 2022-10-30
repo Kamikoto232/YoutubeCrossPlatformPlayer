@@ -34,7 +34,7 @@
 
         <ListBox Items="{Binding VideoSearchResults}" HorizontalAlignment="Center"
                  VerticalAlignment="Stretch"
-                 Margin="0,50,0,40" Background="Transparent" SelectedIndex="{Binding SelectedVideoID}">
+                 Margin="0,50,0,50" Background="Transparent" SelectedIndex="{Binding SelectedVideoID}">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Panel Height="200" Width="260">
@@ -65,7 +65,7 @@
             <Button IsEnabled="{Binding !downloadVideoInfo.Downloading}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Save}"> Скачать </Button>
             <Button VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Play}"> Воспроизвести </Button>
             
-            <ToggleSwitch IsChecked="{Binding allInQueue}" Height="50" VerticalAlignment="Bottom"> Все в очередь </ToggleSwitch>
+            <!-- <ToggleSwitch IsChecked="{Binding allInQueue}" Height="50" VerticalAlignment="Bottom"> Все в очередь </ToggleSwitch> -->
 
             <Expander Header="{Binding CurrentVideoStreamInfos.Length}" ExpandDirection="Up"
                       HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="0,0,50,0">
