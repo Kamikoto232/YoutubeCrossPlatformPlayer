@@ -9,85 +9,125 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="Youtube Player"
         Background="Transparent"
-        TransparencyLevelHint="Blur"
-        ExtendClientAreaToDecorationsHint="True">
+        TransparencyLevelHint="Mica"
+        ExtendClientAreaToDecorationsHint="False">
 
     <Design.DataContext>
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Panel VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="10,30,10,30">
+    <ExperimentalAcrylicBorder VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="0,0,0,0">
+        <ExperimentalAcrylicBorder.Material>
+            <ExperimentalAcrylicMaterial TintColor="#1f0a0d" TintOpacity="1" MaterialOpacity="0">
+            </ExperimentalAcrylicMaterial>
+        </ExperimentalAcrylicBorder.Material>
 
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-            <TextBlock VerticalAlignment="Top">YouTube
-            Player</TextBlock>
+        <Panel IsHitTestVisible="True" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="5,0,5,0">
+            <!-- <TextBlock VerticalAlignment="Top" HorizontalAlignment="Center" Margin="5">YouTube Player</TextBlock> -->
+            <TabControl HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,0,0,0">
+                <TabItem Header="Поиск" VerticalContentAlignment="Center">
+                    <Panel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                            <TextBox Text="{Binding SearchText}" HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                                     Width="500">
+                            </TextBox>
+                            <Button HorizontalAlignment="Stretch" VerticalAlignment="Top" Command="{Binding DoSearch}">
+                                Поиск
+                            </Button>
+                        </StackPanel>
+                        <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowProgressBar}"
+                                     HorizontalAlignment="Stretch"
+                                     VerticalAlignment="Top" Margin="0,33,0,0">
+                        </ProgressBar>
+                        <ListBox SelectionMode="Multiple" Items="{Binding VideoSearchResults}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Stretch"
+                                 Margin="0,50,0,50" Background="Transparent" SelectedItems="{Binding SelectedVideos}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Panel Height="200" Width="260">
+                                        <ToolTip.Tip>
+                                            <UserControl Content="{Binding SearchResult.Title}" MaxHeight="1000" />
+                                        </ToolTip.Tip>
+                                        <Image asyncImageLoader:ImageLoader.Source="{Binding previewUrl}"
+                                               HorizontalAlignment="Stretch">
+                                        </Image>
+                                        <TextBlock Text="{Binding SearchResult.Title}" VerticalAlignment="Top"></TextBlock>
+                                        <TextBlock Text="{Binding SearchResult.Author}" VerticalAlignment="Bottom"
+                                                   HorizontalAlignment="Left">
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding SearchResult.Duration}" VerticalAlignment="Bottom"
+                                                   HorizontalAlignment="Right">
+                                        </TextBlock>
+                                    </Panel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
 
-            <TextBox Text="{Binding SearchText}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Width="500"> </TextBox>
-            <Button HorizontalAlignment="Stretch" VerticalAlignment="Top" Command="{Binding DoSearch}">
-                Поиск
-            </Button>
-        </StackPanel>
-
-        <ProgressBar IsIndeterminate="True" IsVisible="{Binding ShowProgressBar}" HorizontalAlignment="Stretch"
-                     VerticalAlignment="Top" Margin="0,33,0,0">
-        </ProgressBar>
-
-        <ListBox Items="{Binding VideoSearchResults}" HorizontalAlignment="Center"
-                 VerticalAlignment="Stretch"
-                 Margin="0,50,0,50" Background="Transparent" SelectedIndex="{Binding SelectedVideoID}">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Panel Height="200" Width="260">
-                        <ToolTip.Tip>
-                            <UserControl Content="{Binding SearchResult.Title}" MaxHeight="1000" />
-                        </ToolTip.Tip>
-                        <Image asyncImageLoader:ImageLoader.Source="{Binding previewUrl}" HorizontalAlignment="Stretch"> </Image>
-                        <TextBlock Text="{Binding SearchResult.Title}" VerticalAlignment="Top"></TextBlock>
-                        <TextBlock Text="{Binding SearchResult.Author}" VerticalAlignment="Bottom"
-                                   HorizontalAlignment="Left">
-                        </TextBlock>
-                        <TextBlock Text="{Binding SearchResult.Duration}" VerticalAlignment="Bottom"
-                                   HorizontalAlignment="Right">
-                        </TextBlock>
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                        </ListBox>
                     </Panel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
+                </TabItem>
+                <TabItem>
+                    <TabItem.Header>
+                        <TextBlock VerticalAlignment="Center">Загрузки</TextBlock>
+                    </TabItem.Header>
+                    <ItemsControl Items="{Binding DownloadVideoInfos}" HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Panel Height="25" Margin="5">
+                                    <ProgressBar IsIndeterminate="{Binding Initalizing}" Maximum="1"
+                                                 Value="{Binding Progress}" VerticalAlignment="Bottom">
+                                    </ProgressBar>
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Top"
+                                               HorizontalAlignment="Left" />
+                                    <TextBlock Text="{Binding ProgressText}" VerticalAlignment="Top"
+                                               HorizontalAlignment="Right" />
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </TabItem>
+            </TabControl>
 
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel />
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-        </ListBox>
+            <Panel VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Margin="0,0,0,5" Height="50">
+                <StackPanel HorizontalAlignment="Left">
+                    <TextBlock>Путь до проигрывателя</TextBlock>
+                    <TextBox Text="{Binding PlayerPath}" HorizontalAlignment="Left" Width="200"></TextBox>
 
-        <StackPanel VerticalAlignment="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
-            <TextBox Text="{Binding PlayerPath}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Width="200"> </TextBox>
-            <Button IsEnabled="{Binding !downloadVideoInfo.Downloading}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Save}"> Скачать </Button>
-            <Button VerticalAlignment="Bottom" HorizontalAlignment="Center" Command="{Binding Play}"> Воспроизвести </Button>
+                </StackPanel>
+                
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
+                    <Button Command="{Binding Save}"> Скачать </Button>
+                    <Button Command="{Binding Play}"> Воспроизвести </Button>
+                </StackPanel>
+            </Panel>
             
-            <!-- <ToggleSwitch IsChecked="{Binding allInQueue}" Height="50" VerticalAlignment="Bottom"> Все в очередь </ToggleSwitch> -->
-
-            <Expander Header="{Binding CurrentVideoStreamInfos.Length}" ExpandDirection="Up"
-                      HorizontalAlignment="Right" VerticalAlignment="Bottom" Padding="0,0,50,0">
-                <ListBox Items="{Binding CurrentVideoStreamInfos}" SelectedIndex="{Binding selectedVideoQuality}"
-                         HorizontalAlignment="Stretch">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Panel>
-                                <TextBlock Text="{Binding}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-                                </TextBlock>
-                            </Panel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+            <Expander Header="{Binding streamQuality.QualityString}" ExpandDirection="Up"
+                      HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,5" Width="120">
+                <StackPanel Orientation="Vertical">
+                    <RadioButton IsChecked="{Binding streamQuality.AudioOnly }">
+                        <TextBlock>Audio</TextBlock>
+                    </RadioButton>
+                    <RadioButton IsChecked="{Binding streamQuality.LQ }">
+                        <TextBlock>LQ</TextBlock>
+                    </RadioButton>
+                    <RadioButton IsChecked="{Binding streamQuality.MQ }">
+                        <TextBlock>MQ</TextBlock>
+                    </RadioButton>
+                    <RadioButton IsChecked="{Binding streamQuality.HQ }">
+                        <TextBlock>HQ</TextBlock>
+                    </RadioButton>
+                </StackPanel>
             </Expander>
             
-        </StackPanel>
-        <ProgressBar IsIndeterminate="True" IsVisible="{Binding downloadVideoInfo.Downloading}" HorizontalAlignment="Stretch"
-                     VerticalAlignment="Bottom" Margin="0,11,0,-11" Maximum="{Binding downloadVideoInfo.TotalBytes}"
-                     Value="{Binding downloadVideoInfo.CurrentBytes}">
-        </ProgressBar>
-
-    </Panel>
-
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding Processing}" HorizontalAlignment="Stretch"
+                         VerticalAlignment="Bottom">
+            </ProgressBar>
+        </Panel>
+    </ExperimentalAcrylicBorder>
 </Window>

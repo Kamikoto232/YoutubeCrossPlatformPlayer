@@ -5,8 +5,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Microsoft.CodeAnalysis.CSharp;
 using ReactiveUI;
 using YoutubeExplode;
 using YoutubeExplode.Search;
@@ -17,18 +19,11 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
     public class MainWindowViewModel : ViewModelBase
     {
         private readonly YoutubeClient youtube;
-        private bool showProgressBar;
-        private bool showDownloadProgressBar;
-        private bool allInQueue { get; set; }
-        private static string? searchText;
-        private ObservableCollection<VideoData>? videoSearchResults;
-        private const uint maxResults = 100;
-        private int selectedVideoID;
-        private MuxedStreamInfo[] currentVideoStreamInfos;
-        private DownloadVideoInfo downloadVideoInfo { get; set; } = new DownloadVideoInfo();
-        
+        private const byte maxResults = 100;
+        private StreamQuality streamQuality { get; set; } = new StreamQuality();
+
         private int selectedVideoQuality { get; set; }
-        private string playerPath = "";
+        private string playerPath = @"C:\Program Files\VideoLAN\VLC\vlc.exe";
 
         public string PlayerPath
         {
@@ -36,21 +31,35 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             set => this.RaiseAndSetIfChanged(ref playerPath, value);
         }
 
-        public int SelectedVideoID
+        private ObservableCollection<DownloadVideoInfo>? downloadVideoInfos;
+
+        public ObservableCollection<DownloadVideoInfo>? DownloadVideoInfos
         {
-            get => selectedVideoID;
+            get => downloadVideoInfos;
+            set => this.RaiseAndSetIfChanged(ref downloadVideoInfos, value);
+        }
+
+        private ObservableCollection<VideoData>? selectedVideos;
+
+        public ObservableCollection<VideoData>? SelectedVideos
+        {
+            get => selectedVideos;
             set
             {
-                selectedVideoID = value;
-                UpdateSelection();
+                selectedVideos = value;
+                //UpdateSelection();
             }
         }
 
-        public MuxedStreamInfo[] CurrentVideoStreamInfos
+        private IStreamInfo[] currentStreamInfos = Array.Empty<IStreamInfo>();
+
+        public IStreamInfo[] CurrentVideoStreamInfos
         {
-            get => currentVideoStreamInfos;
-            set => this.RaiseAndSetIfChanged(ref currentVideoStreamInfos, value);
+            get => currentStreamInfos;
+            set => this.RaiseAndSetIfChanged(ref currentStreamInfos, value);
         }
+
+        private bool showProgressBar;
 
         public bool ShowProgressBar
         {
@@ -58,17 +67,23 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             set => this.RaiseAndSetIfChanged(ref showProgressBar, value);
         }
 
-        public bool ShowDownloadProgressBar
+        private bool processing;
+
+        public bool Processing
         {
-            get => showDownloadProgressBar;
-            set => this.RaiseAndSetIfChanged(ref showDownloadProgressBar, value);
+            get => processing;
+            set => this.RaiseAndSetIfChanged(ref processing, value);
         }
 
-        public static string? SearchText
+        private string? searchText;
+
+        public string? SearchText
         {
             get => searchText;
-            set => searchText = value;
+            set => this.RaiseAndSetIfChanged(ref searchText, value);
         }
+
+        private ObservableCollection<VideoData>? videoSearchResults;
 
         public ObservableCollection<VideoData>? VideoSearchResults
         {
@@ -79,13 +94,16 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
         public MainWindowViewModel()
         {
             youtube = new YoutubeClient();
+            SelectedVideos = new ObservableCollection<VideoData>();
+            DownloadVideoInfos = new ObservableCollection<DownloadVideoInfo>();
+            VideoSearchResults = new ObservableCollection<VideoData>();
         }
 
         public async void DoSearch()
         {
+            if (string.IsNullOrEmpty(SearchText)) return;
             var searchPhrase = SearchText;
             VideoSearchResults?.Clear();
-            VideoSearchResults = new ObservableCollection<VideoData>();
 
             ShowProgressBar = true;
 
@@ -100,7 +118,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                         VideoSearchResults.Add(new VideoData(video));
                         break;
                     }
-                    case PlaylistSearchResult playlist:
+                    /*case PlaylistSearchResult playlist:
                     {
                         var id = playlist.Id;
                         var title = playlist.Title;
@@ -111,60 +129,49 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                         var id = channel.Id;
                         var title = channel.Title;
                         break;
-                    }
+                    }*/
                 }
 
                 ShowProgressBar = false;
             }
         }
 
-        private async void UpdateSelection()
-        {
-            if (videoSearchResults == null || selectedVideoID < 0 ||
-                selectedVideoID > videoSearchResults?.Count) return;
-            try
-            {
-                var streamManifest =
-                    await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID].SearchResult.Url);
-                CurrentVideoStreamInfos = streamManifest.GetMuxedStreams().ToArray();
-                selectedVideoQuality = 0;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                CurrentVideoStreamInfos = Array.Empty<MuxedStreamInfo>();
-            }
-        }
+        // private async void UpdateSelection()
+        // {
+        //     if (videoSearchResults?.Count == 0 || SelectedVideoIDs.Count == 0) return;
+        //     try
+        //     {
+        //         var streamManifest =
+        //             await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[SelectedVideoIDs[0]].SearchResult
+        //                 .Url);
+        //         CurrentVideoStreamInfos = streamManifest.GetMuxedStreams().ToArray();
+        //         selectedVideoQuality = 0;
+        //     }
+        //     catch (Exception e)
+        //     {
+        //         Console.WriteLine(e);
+        //         CurrentVideoStreamInfos = Array.Empty<IStreamInfo>();
+        //         throw;
+        //     }
+        // }
 
         public async void Play()
         {
-            if (videoSearchResults == null) return;
+            if (videoSearchResults?.Count == 0 || selectedVideos?.Count == 0) return;
+            Processing = true;
+
             try
             {
-                string urls = "";
+                var arrayStreamSelectionDatas = await GetVideosSelectionDatasAsync(selectedVideos.ToArray());
+                var stringBuilder = new StringBuilder(arrayStreamSelectionDatas.Length);
 
-                if (allInQueue)
+                foreach (StreamSelectionData videoSelectionData in arrayStreamSelectionDatas)
                 {
-                    for (int i = selectedVideoID; i < videoSearchResults.Count; i++)
-                    {
-                        try
-                        {
-                            var streamManifest =
-                                await youtube.Videos.Streams.GetManifestAsync(videoSearchResults[selectedVideoID]
-                                    .SearchResult.Url);
-                            var videoStreamInfoInfo = streamManifest.GetMuxedStreams().ToArray()[selectedVideoQuality];
-                            urls += videoStreamInfoInfo.Url + " ";
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine(e);
-                        }
-                    }
+                    stringBuilder.Append($" {videoSelectionData.StreamInfo.Url}");
                 }
-                else
-                {
-                    urls = CurrentVideoStreamInfos[selectedVideoQuality].Url;
-                }
+
+                string urls = stringBuilder.ToString();
+                Processing = false;
 
                 var process = new Process
                 {
@@ -184,63 +191,196 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
 
         public async void Save()
         {
-            if (videoSearchResults == null) return;
+            if (videoSearchResults?.Count == 0 || selectedVideos.Count == 0) return;
 
-            SaveFileDialog saveFileDialog = new SaveFileDialog();
-            saveFileDialog.Filters = new List<FileDialogFilter>();
-            var filter = new FileDialogFilter();
-            filter.Extensions.Add(CurrentVideoStreamInfos[selectedVideoQuality].Container.Name);
-            saveFileDialog.Filters.Add(filter);
-
-            var path = await saveFileDialog.ShowAsync(new Window());
-            //path += "."+CurrentVideoStreamInfos[selectedVideoQuality].Container.Name;
+            string? path = await OpenSaveDialog();
             if (string.IsNullOrEmpty(path)) return;
-            await Task.Run(()=>DownloadTask(path, CurrentVideoStreamInfos[selectedVideoQuality].Url));
+
+            foreach (var video in selectedVideos)
+            {
+                downloadVideoInfos.Add(new DownloadVideoInfo(youtube, video.SearchResult.Title, downloadVideoInfos));
+            }
+
+            var arrayStreamSelectionDatas = await GetVideosSelectionDatasAsync(selectedVideos.ToArray());
+
+            for (int i = 0; i < arrayStreamSelectionDatas.Length; i++)
+            {
+                StreamSelectionData streamSelection = arrayStreamSelectionDatas[i];
+                string fileName = GetValidName(streamSelection.Title);
+                string filePath = GetFileName(path, fileName, streamSelection.StreamInfo.Container.Name);
+                downloadVideoInfos[i].StartDownload(streamSelection.StreamInfo, filePath);
+            }
         }
 
-        private async void DownloadTask(string path, string url)
+        private string GetFileName(string path, string Name, string container)
         {
-            downloadVideoInfo.Downloading = true;
-           
-            using (var httpClient = new HttpClient())
-            {
-                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
-                {
-                    using (Stream contentStream =
-                           await (await httpClient.SendAsync(request)).Content.ReadAsStreamAsync(),
-                           stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
-                    {
-                        downloadVideoInfo.TotalBytes = stream.Length;
-                        downloadVideoInfo.CurrentBytes = stream.Position;
+            return $@"{path}\{Name}.{container}";
+        }
 
-                        await contentStream.CopyToAsync(stream);
-                    }
+        private string GetValidName(string Name)
+        {
+            return Path.GetInvalidFileNameChars().Aggregate(Name,
+                (current, invalidChar) => current.Replace(invalidChar.ToString(), "_"));
+        }
+
+        private async Task<StreamSelectionData[]> GetVideosSelectionDatasAsync(VideoData[] selection)
+        {
+            var videoSelectionDatas = new List<StreamSelectionData>();
+            foreach (VideoData videoData in selection)
+            {
+                try
+                {
+                    var streamInfos = await GetStreamInfos(videoData.SearchResult.Url);
+
+                    IStreamInfo streamInfo =
+                        streamQuality.AudioOnly
+                            ? streamInfos.GetWithHighestBitrate()
+                            : streamInfos[streamQuality.GetSelectrdStreamQualityIndex((streamInfos).Length)];
+
+                    var videoSelectionData = new StreamSelectionData(streamInfo, videoData.SearchResult.Title);
+                    videoSelectionDatas.Add(videoSelectionData);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
                 }
             }
-            
-            downloadVideoInfo.Downloading = false;
+
+            return videoSelectionDatas.ToArray();
         }
+
+        private async Task<IStreamInfo[]> GetStreamInfos(string url)
+        {
+            var streamInfos = Array.Empty<IStreamInfo>();
+
+            try
+            {
+                var streamManifest = await youtube.Videos.Streams.GetManifestAsync(url);
+
+                if (streamQuality.AudioOnly)
+                {
+                    streamInfos = streamManifest.GetAudioOnlyStreams().ToArray();
+                }
+                else
+                {
+                    streamInfos = streamManifest.GetMuxedStreams().ToArray();
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+            }
+
+            return streamInfos;
+        }
+
+        private async Task<string?> OpenSaveDialog()
+        {
+            return await OpenSelectFolderDialog();
+        }
+
+        private async Task<string?> OpenSaveFileDialog()
+        {
+            SaveFileDialog saveFileDialog = new SaveFileDialog
+            {
+                Title = "Выберите место сохранения видео",
+                Directory = Environment.CurrentDirectory,
+                Filters = new List<FileDialogFilter>()
+                {
+                    new FileDialogFilter
+                    {
+                        Extensions = new List<string> { CurrentVideoStreamInfos[selectedVideoQuality].Container.Name }
+                    }
+                }
+            };
+            string? path = await saveFileDialog.ShowAsync(new Window());
+            return path;
+        }
+
+        private async Task<string?> OpenSelectFolderDialog()
+        {
+            var saveFileDialog = new OpenFolderDialog
+            {
+                Title = "Выберите место сохранения видео",
+                Directory = Environment.CurrentDirectory,
+            };
+            string? path = await saveFileDialog.ShowAsync(new Window());
+            return path;
+        }
+
 
         public class DownloadVideoInfo : ViewModelBase
         {
-            public bool downloading;
-            public long totalBytes;
-            public long currentBytes;
+            private YoutubeClient youtubeClient;
+            private ObservableCollection<DownloadVideoInfo> collection;
 
-            public bool Downloading
+            public DownloadVideoInfo(YoutubeClient youtubeClient, string title,
+                ObservableCollection<DownloadVideoInfo> collection)
             {
-                get => downloading;
-                set => this.RaiseAndSetIfChanged(ref downloading, value);
+                this.youtubeClient = youtubeClient;
+                this.collection = collection;
+                this.title = title;
+                Initalizing = true;
             }
-            public long TotalBytes
+
+            public void StartDownload(IStreamInfo streamInfo, string filePath)
             {
-                get => totalBytes;
-                set => this.RaiseAndSetIfChanged(ref totalBytes, value);
+                Initalizing = false;
+                Download(youtubeClient, streamInfo, filePath, collection);
             }
-            public long CurrentBytes
+
+            private async void Download(YoutubeClient youtubeClient, IStreamInfo streamInfo, string filePath,
+                ObservableCollection<DownloadVideoInfo> collection)
             {
-                get => currentBytes;
-                set => this.RaiseAndSetIfChanged(ref currentBytes, value);
+                await youtubeClient.Videos.Streams.DownloadAsync(streamInfo, filePath,
+                    new Progress<double>(d =>
+                    {
+                        Progress = d;
+                        ProgressText = d.ToString("P");
+                    }));
+                Completed = true;
+                collection.Remove(this);
+            }
+
+            private string title;
+
+            public string Title
+            {
+                get => title;
+                set => this.RaiseAndSetIfChanged(ref title, value);
+            }
+
+            private bool initalizing;
+
+            public bool Initalizing
+            {
+                get => initalizing;
+                set => this.RaiseAndSetIfChanged(ref initalizing, value);
+            }
+
+
+            private bool completed;
+
+            public bool Completed
+            {
+                get => completed;
+                set => this.RaiseAndSetIfChanged(ref completed, value);
+            }
+
+            private string progressText;
+
+            public string ProgressText
+            {
+                get => progressText;
+                set => this.RaiseAndSetIfChanged(ref progressText, value);
+            }
+            
+            private double progress;
+
+            public double Progress
+            {
+                get => progress;
+                set => this.RaiseAndSetIfChanged(ref progress, value);
             }
         }
 
@@ -253,6 +393,100 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             {
                 SearchResult = searchResult;
                 previewUrl = (SearchResult.Thumbnails[2].Url);
+            }
+        }
+
+        public struct StreamSelectionData
+        {
+            public IStreamInfo StreamInfo;
+            public string Title;
+
+            public StreamSelectionData(IStreamInfo streamInfo, string title)
+            {
+                StreamInfo = streamInfo;
+                Title = title;
+            }
+        }
+
+        private class StreamQuality : ViewModelBase
+        {
+            private bool hq = true;
+
+            public bool HQ
+            {
+                get
+                {
+                    return hq;
+                }
+                set
+                {
+                    QualityString = "HQ";
+                    this.RaiseAndSetIfChanged(ref hq, value);
+                }
+            }
+
+            private bool mq;
+
+            public bool MQ
+            {
+                get { return mq; }
+                set
+                {
+                    QualityString = "MQ";
+                    this.RaiseAndSetIfChanged(ref mq, value);
+                }
+            }
+
+            private bool lq;
+
+            public bool LQ
+            {
+                get { return lq; }
+                set
+                {
+                    QualityString = "LQ";
+                    this.RaiseAndSetIfChanged(ref lq, value);
+                }
+            }
+
+            private bool audioOnly;
+
+            public bool AudioOnly
+            {
+                get { return audioOnly; }
+                set
+                {
+                    QualityString = "Audio";
+                    this.RaiseAndSetIfChanged(ref audioOnly, value);
+                }
+            }
+
+
+            private string qualityString = "HQ";
+
+            public string QualityString
+            {
+                get => qualityString;
+                set => this.RaiseAndSetIfChanged(ref qualityString, value);
+            }
+
+
+            public int GetSelectrdStreamQualityIndex(int maxQualityIndex)
+            {
+                int quality = maxQualityIndex - 1;
+                if (MQ) quality = 1;
+                if (LQ) quality = 0;
+                return quality;
+            }
+
+            public string GetSelectrdStreamQualityString()
+            {
+                string quality = "HQ";
+
+                if (MQ) quality = "MQ";
+                if (LQ) quality = "LQ";
+                if (AudioOnly) quality = "Audio";
+                return quality;
             }
         }
     }
