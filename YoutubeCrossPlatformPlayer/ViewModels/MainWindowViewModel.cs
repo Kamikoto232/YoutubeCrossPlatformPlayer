@@ -167,7 +167,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
 
                 foreach (StreamSelectionData videoSelectionData in arrayStreamSelectionDatas)
                 {
-                    stringBuilder.Append($" {videoSelectionData.StreamInfo.Url}");
+                    stringBuilder.Append($" {videoSelectionData.Url}");
                 }
 
                 string urls = stringBuilder.ToString();
@@ -196,12 +196,18 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             string? path = await OpenSaveDialog();
             if (string.IsNullOrEmpty(path)) return;
 
-            foreach (var video in selectedVideos)
+            var videosOnly = selectedVideos.Where(v => v.IsLive == false).ToArray();
+
+            foreach (var video in videosOnly)
             {
-                downloadVideoInfos.Add(new DownloadVideoInfo(youtube, video.SearchResult.Title, downloadVideoInfos));
+                downloadVideoInfos.Add(new DownloadVideoInfo(youtube, video.SearchResult.Title,
+                    downloadVideoInfos));
             }
 
-            var arrayStreamSelectionDatas = await GetVideosSelectionDatasAsync(selectedVideos.ToArray());
+            if (downloadVideoInfos.Count == 0) return;
+
+
+            var arrayStreamSelectionDatas = await GetVideosSelectionDatasAsync(videosOnly);
 
             for (int i = 0; i < arrayStreamSelectionDatas.Length; i++)
             {
@@ -230,14 +236,22 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             {
                 try
                 {
-                    var streamInfos = await GetStreamInfos(videoData.SearchResult.Url);
+                    string? url = null;
+                    IStreamInfo streamInfo = null;
+                    if (videoData.IsLive)
+                        url = await youtube.Videos.Streams.GetHttpLiveStreamUrlAsync(videoData.SearchResult.Id);
+                    else
+                    {
+                        var streamInfos = await GetStreamInfos(videoData.SearchResult.Url);
 
-                    IStreamInfo streamInfo =
-                        streamQuality.AudioOnly
-                            ? streamInfos.GetWithHighestBitrate()
-                            : streamInfos[streamQuality.GetSelectrdStreamQualityIndex((streamInfos).Length)];
+                        streamInfo =
+                            streamQuality.AudioOnly
+                                ? streamInfos.GetWithHighestBitrate()
+                                : streamInfos[streamQuality.GetSelectrdStreamQualityIndex((streamInfos).Length)];
+                        url = streamInfo.Url;
+                    }
 
-                    var videoSelectionData = new StreamSelectionData(streamInfo, videoData.SearchResult.Title);
+                    var videoSelectionData = new StreamSelectionData(streamInfo, videoData.SearchResult.Title, url);
                     videoSelectionDatas.Add(videoSelectionData);
                 }
                 catch (Exception e)
@@ -374,7 +388,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                 get => progressText;
                 set => this.RaiseAndSetIfChanged(ref progressText, value);
             }
-            
+
             private double progress;
 
             public double Progress
@@ -389,10 +403,19 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             public VideoSearchResult SearchResult { get; set; }
             private string previewUrl { get; set; }
 
+            private bool isLive = true;
+
+            public bool IsLive
+            {
+                get { return isLive; }
+                set { this.RaiseAndSetIfChanged(ref isLive, value); }
+            }
+
             public VideoData(VideoSearchResult searchResult)
             {
                 SearchResult = searchResult;
                 previewUrl = (SearchResult.Thumbnails[2].Url);
+                IsLive = SearchResult.Duration == null;
             }
         }
 
@@ -400,11 +423,13 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
         {
             public IStreamInfo StreamInfo;
             public string Title;
+            public string? Url;
 
-            public StreamSelectionData(IStreamInfo streamInfo, string title)
+            public StreamSelectionData(IStreamInfo streamInfo, string title, string? url)
             {
                 StreamInfo = streamInfo;
                 Title = title;
+                Url = url;
             }
         }
 
@@ -414,10 +439,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
 
             public bool HQ
             {
-                get
-                {
-                    return hq;
-                }
+                get { return hq; }
                 set
                 {
                     QualityString = "HQ";

@@ -22,7 +22,7 @@
             </ExperimentalAcrylicMaterial>
         </ExperimentalAcrylicBorder.Material>
 
-        <Panel IsHitTestVisible="True" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Margin="5,0,5,0">
+        <Panel IsHitTestVisible="True" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
             <!-- <TextBlock VerticalAlignment="Top" HorizontalAlignment="Center" Margin="5">YouTube Player</TextBlock> -->
             <TabControl HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,0,0,0">
                 <TabItem Header="Поиск" VerticalContentAlignment="Center">
@@ -49,16 +49,32 @@
                                         <ToolTip.Tip>
                                             <UserControl Content="{Binding SearchResult.Title}" MaxHeight="1000" />
                                         </ToolTip.Tip>
+
                                         <Image asyncImageLoader:ImageLoader.Source="{Binding previewUrl}"
                                                HorizontalAlignment="Stretch">
                                         </Image>
-                                        <TextBlock Text="{Binding SearchResult.Title}" VerticalAlignment="Top"></TextBlock>
-                                        <TextBlock Text="{Binding SearchResult.Author}" VerticalAlignment="Bottom"
-                                                   HorizontalAlignment="Left">
+
+                                        <TextBlock Text="{Binding SearchResult.Title}" VerticalAlignment="Top"
+                                                   Margin="5">
                                         </TextBlock>
-                                        <TextBlock Text="{Binding SearchResult.Duration}" VerticalAlignment="Bottom"
-                                                   HorizontalAlignment="Right">
-                                        </TextBlock>
+
+                                        <Panel VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Margin="5">
+                                            <TextBlock Text="{Binding SearchResult.Author}"
+                                                       HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding SearchResult.Duration}"
+                                                       HorizontalAlignment="Right">
+                                            </TextBlock>
+
+                                            <Border Background="DarkRed" CornerRadius="3" HorizontalAlignment="Right"
+                                                    Padding="2"
+                                                    IsVisible="{Binding IsLive}">
+                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                    <Ellipse Fill="Red" Width="10" Height="10"></Ellipse>
+                                                    <TextBlock Text="LIVE"></TextBlock>
+                                                </StackPanel>
+                                            </Border>
+                                        </Panel>
                                     </Panel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -100,13 +116,13 @@
                     <TextBox Text="{Binding PlayerPath}" HorizontalAlignment="Left" Width="200"></TextBox>
 
                 </StackPanel>
-                
+
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="20">
                     <Button Command="{Binding Save}"> Скачать </Button>
                     <Button Command="{Binding Play}"> Воспроизвести </Button>
                 </StackPanel>
             </Panel>
-            
+
             <Expander Header="{Binding streamQuality.QualityString}" ExpandDirection="Up"
                       HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,5" Width="120">
                 <StackPanel Orientation="Vertical">
@@ -124,7 +140,7 @@
                     </RadioButton>
                 </StackPanel>
             </Expander>
-            
+
             <ProgressBar IsIndeterminate="True" IsVisible="{Binding Processing}" HorizontalAlignment="Stretch"
                          VerticalAlignment="Bottom">
             </ProgressBar>
