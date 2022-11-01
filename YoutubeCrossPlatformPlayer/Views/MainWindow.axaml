@@ -45,48 +45,59 @@
                                  Margin="0,50,0,50" Background="Transparent" SelectedItems="{Binding SelectedVideos}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Panel Height="200" Width="260">
+                                    <Border Background="Black" CornerRadius="5" Height="200" Width="260" BoxShadow="5 5 10 2 #50000000">
                                         <ToolTip.Tip>
-                                            <UserControl Content="{Binding  }" MaxHeight="1000" />
+                                            <StackPanel Orientation="Vertical">
+                                                <TextBlock Text="{Binding Inform.Title}" MaxHeight="1000" />
+                                                <TextBlock Text="{Binding Inform.Author}" MaxHeight="1000" />
+                                            </StackPanel>
                                         </ToolTip.Tip>
+                                        <Panel>
 
-                                        <Image asyncImageLoader:ImageLoader.Source="{Binding  Inform.PrevievUrl}"
-                                               HorizontalAlignment="Stretch">
-                                        </Image>
-
-                                        
-                                        <TextBlock Text="{Binding Inform.Title}" VerticalAlignment="Top"
-                                                   Margin="5">
-                                        </TextBlock>
-
-                                        <Panel VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Margin="5">
-                                            <TextBlock Text="{Binding Inform.Author}"
-                                                       HorizontalAlignment="Left" VerticalAlignment="Bottom">
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding Inform.Duration}"
-                                                       HorizontalAlignment="Right">
+                                            <Image asyncImageLoader:ImageLoader.Source="{Binding  Inform.PrevievUrl}"
+                                                   HorizontalAlignment="Stretch">
+                                            </Image>
+                                            
+                                            <TextBlock Text="{Binding Inform.Title}" VerticalAlignment="Top"
+                                                       Margin="5">
                                             </TextBlock>
 
-                                            <Border Background="DarkRed" CornerRadius="3" HorizontalAlignment="Right"
-                                                    Padding="2"
-                                                    IsVisible="{Binding ViewParameters.IsLive}">
-                                                <StackPanel Orientation="Horizontal" Spacing="5">
-                                                    <Ellipse Fill="Red" Width="10" Height="10"></Ellipse>
-                                                    <TextBlock Text="LIVE"></TextBlock>
+                                            <Border CornerRadius="3" Background="#90000000" Width="100"
+                                                    HorizontalAlignment="Right" Padding="2"
+                                                    IsVisible="{Binding ViewParameters.IsPlaylist}">
+                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                            Spacing="5">
+                                                    <TextBlock Text="Плейлист" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Inform.PlaylistLenght}" HorizontalAlignment="Center" />
                                                 </StackPanel>
                                             </Border>
-                                            <Border Background="#808080" CornerRadius="3" HorizontalAlignment="Right"
-                                                    Padding="2"
-                                                    IsVisible="{Binding ViewParameters.IsPlaylist}">
-                                                <TextBlock Text="Плейлист"></TextBlock>
-                                            </Border>
-                                            <Border Background="DarkGray" CornerRadius="3" HorizontalAlignment="Right"
-                                                    Padding="2"
-                                                    IsVisible="{Binding ViewParameters.IsChannel}">
-                                                <TextBlock Text="Канал"></TextBlock>
-                                            </Border>
+
+                                            <Panel VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Margin="5">
+                                                <TextBlock Text="{Binding Inform.Author}"
+                                                           HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Inform.Duration}"
+                                                           HorizontalAlignment="Right">
+                                                </TextBlock>
+
+                                                <Border Background="DarkRed" CornerRadius="3"
+                                                        HorizontalAlignment="Right" Padding="2"
+                                                        IsVisible="{Binding ViewParameters.IsLive}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                                        <Ellipse Fill="Red" Width="10" Height="10"></Ellipse>
+                                                        <TextBlock Text="LIVE"></TextBlock>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Background="DarkGray" CornerRadius="3"
+                                                        HorizontalAlignment="Right"
+                                                        Padding="2"
+                                                        IsVisible="{Binding ViewParameters.IsChannel}">
+                                                    <TextBlock Text="Канал"></TextBlock>
+                                                </Border>
+                                            </Panel>
                                         </Panel>
-                                    </Panel>
+
+                                    </Border>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
 

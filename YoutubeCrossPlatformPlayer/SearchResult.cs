@@ -1,6 +1,7 @@
 ﻿using System;
 using ReactiveUI;
 using YoutubeCrossPlatformPlayer.ViewModels;
+using YoutubeExplode;
 using YoutubeExplode.Channels;
 using YoutubeExplode.Common;
 using YoutubeExplode.Search;
@@ -8,7 +9,7 @@ using YoutubeExplode.Videos;
 
 namespace YoutubeCrossPlatformPlayer;
 
-public class SearchResultBase: ViewModelBase
+public class SearchResultBase : ViewModelBase
 {
     private ResultType type;
 
@@ -27,7 +28,7 @@ public class SearchResultBase: ViewModelBase
         get => inform;
         set => this.RaiseAndSetIfChanged(ref inform, value);
     }
-    
+
     private ViewParametersData viewParameters;
 
     public ViewParametersData ViewParameters
@@ -36,7 +37,7 @@ public class SearchResultBase: ViewModelBase
         set => this.RaiseAndSetIfChanged(ref viewParameters, value);
     }
 
-    public SearchResultBase(ISearchResult searchResult)
+    public SearchResultBase(ISearchResult searchResult, YoutubeClient youtubeClient)
     {
         SearchResult = searchResult;
         switch (searchResult)
@@ -47,15 +48,28 @@ public class SearchResultBase: ViewModelBase
                 break;
             case PlaylistSearchResult result:
                 Type = ResultType.Playlist;
-                Inform = new Info(result.Title, result.Author, result.Thumbnails[0].Url);
+                Inform = new Info(result.Title, result.Author, result.Thumbnails[2].Url);
                 break;
             case ChannelSearchResult result:
                 Type = ResultType.Channel;
-                Inform = new Info(result.Title, new Author(result.Id, result.Title), result.Thumbnails[0].Url);
+                Inform = new Info(result.Title, new Author(result.Id, result.Title),
+                    result.Thumbnails.GetWithHighestResolution().Url);
                 break;
         }
 
         ViewParameters = new ViewParametersData(Type);
+        UpdateMetadata(youtubeClient);
+    }
+
+    private async void UpdateMetadata(YoutubeClient youtubeClient)
+    {
+        switch (Type)
+        {
+            case ResultType.Playlist:
+                var videos = await youtubeClient.Playlists.GetVideosAsync(SearchResult.Url);
+                Inform = new Info(Inform,(ulong)videos.Count);
+                break;
+        }
     }
 
     public enum ResultType : byte
@@ -70,7 +84,7 @@ public class SearchResultBase: ViewModelBase
     {
         if ((Type == ResultType.Live))
             return ((VideoSearchResult)SearchResult).Id;
-        
+
         throw new Exception();
     }
 
@@ -84,18 +98,19 @@ public class SearchResultBase: ViewModelBase
         public ViewParametersData(ResultType type)
         {
             IsLive = type == ResultType.Live;
-            IsVideo = type== ResultType.Video;
-            IsPlaylist = type== ResultType.Playlist;
-            IsChannel = type== ResultType.Channel;
+            IsVideo = type == ResultType.Video;
+            IsPlaylist = type == ResultType.Playlist;
+            IsChannel = type == ResultType.Channel;
         }
     }
-    
+
     public struct Info
     {
         public string Title { get; set; }
         public Author Author { get; set; }
         public string PrevievUrl { get; set; }
         public TimeSpan? Duration { get; set; }
+        public ulong PlaylistLenght { get; set; }
 
         public Info(string title, Author? author, string previevUrl, TimeSpan? duration = null)
         {
@@ -103,6 +118,13 @@ public class SearchResultBase: ViewModelBase
             Author = author ?? new Author(new ChannelId(), "null");
             PrevievUrl = previevUrl;
             Duration = duration;
+            PlaylistLenght = 0;
+        }
+
+        public Info(Info info, ulong playlistLenght) : this()
+        {
+            this = info;
+            PlaylistLenght = playlistLenght;
         }
     }
 }

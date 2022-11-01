@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ReactiveUI;
 using YoutubeExplode;
+using YoutubeExplode.Common;
+using YoutubeExplode.Playlists;
 using YoutubeExplode.Search;
 using YoutubeExplode.Videos.Streams;
 
@@ -108,7 +110,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             await foreach (ISearchResult result in youtube.Search.GetResultsAsync(searchPhrase))
             {
                 if (VideoSearchResults.Count > maxResults) break;
-                VideoSearchResults.Add(new SearchResultBase(result));
+                VideoSearchResults.Add(new SearchResultBase(result, youtube));
                 ShowProgressBar = false;
             }
         }
@@ -177,12 +179,14 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
 
             foreach (SearchResultBase video in videosOnly)
             {
+                if (video.Type is SearchResultBase.ResultType.Live or SearchResultBase.ResultType.Channel) continue;
+                
                 downloadVideoInfos.Add(new DownloadVideoInfo(youtube, video.SearchResult.Title,
                     downloadVideoInfos));
             }
 
             if (downloadVideoInfos.Count == 0) return;
-            
+
             var arrayStreamSelectionDatas = await GetVideosSelectionDatasAsync(videosOnly);
 
             for (int i = 0; i < arrayStreamSelectionDatas.Length; i++)
@@ -214,17 +218,21 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                 {
                     string url = "";
                     IStreamInfo streamInfo = null;
-                    if (searchResult.Type == SearchResultBase.ResultType.Live)
-                        url = await youtube.Videos.Streams.GetHttpLiveStreamUrlAsync(searchResult.GetLiveID());
-                    else
+                    switch (searchResult.Type)
                     {
-                        var streamInfos = await GetStreamInfos(searchResult.SearchResult.Url);
-
-                        streamInfo =
-                            streamQuality.AudioOnly
+                        case SearchResultBase.ResultType.Video:
+                            var streamInfos = await GetStreamInfos(searchResult.SearchResult.Url);
+                            streamInfo = streamQuality.AudioOnly
                                 ? streamInfos.GetWithHighestBitrate()
                                 : streamInfos[streamQuality.GetSelectrdStreamQualityIndex((streamInfos).Length)];
-                        url = streamInfo.Url;
+                            url = streamInfo.Url;
+                            break;
+                        case SearchResultBase.ResultType.Live:
+                            url = await youtube.Videos.Streams.GetHttpLiveStreamUrlAsync(searchResult.GetLiveID());
+                            break;
+                        case SearchResultBase.ResultType.Playlist:
+                            url = await GetPlaylistUrls(searchResult.SearchResult.Url);
+                            break;
                     }
 
                     var videoSelectionData = new StreamSelectionData(streamInfo, searchResult.SearchResult.Title, url);
@@ -237,6 +245,17 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             }
 
             return videoSelectionDatas.ToArray();
+            
+            async Task<string> GetPlaylistUrls(string url)
+            {
+                var videos = await youtube.Playlists.GetVideosAsync(url);
+                var stringBuilder = new StringBuilder();
+                foreach (PlaylistVideo video in videos)
+                {
+                    stringBuilder.Append($"{video.Url} ");
+                }
+                return stringBuilder.ToString();
+            }
         }
 
         private async Task<IStreamInfo[]> GetStreamInfos(string url)
