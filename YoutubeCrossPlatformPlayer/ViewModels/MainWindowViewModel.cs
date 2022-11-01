@@ -4,11 +4,9 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Microsoft.CodeAnalysis.CSharp;
 using ReactiveUI;
 using YoutubeExplode;
 using YoutubeExplode.Search;
@@ -39,9 +37,9 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             set => this.RaiseAndSetIfChanged(ref downloadVideoInfos, value);
         }
 
-        private ObservableCollection<VideoData>? selectedVideos;
+        private ObservableCollection<SearchResultBase>? selectedVideos;
 
-        public ObservableCollection<VideoData>? SelectedVideos
+        public ObservableCollection<SearchResultBase>? SelectedVideos
         {
             get => selectedVideos;
             set
@@ -83,9 +81,9 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             set => this.RaiseAndSetIfChanged(ref searchText, value);
         }
 
-        private ObservableCollection<VideoData>? videoSearchResults;
+        private ObservableCollection<SearchResultBase>? videoSearchResults;
 
-        public ObservableCollection<VideoData>? VideoSearchResults
+        public ObservableCollection<SearchResultBase>? VideoSearchResults
         {
             get => videoSearchResults;
             set => this.RaiseAndSetIfChanged(ref videoSearchResults, value);
@@ -94,9 +92,9 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
         public MainWindowViewModel()
         {
             youtube = new YoutubeClient();
-            SelectedVideos = new ObservableCollection<VideoData>();
+            SelectedVideos = new ObservableCollection<SearchResultBase>();
             DownloadVideoInfos = new ObservableCollection<DownloadVideoInfo>();
-            VideoSearchResults = new ObservableCollection<VideoData>();
+            VideoSearchResults = new ObservableCollection<SearchResultBase>();
         }
 
         public async void DoSearch()
@@ -110,28 +108,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             await foreach (ISearchResult result in youtube.Search.GetResultsAsync(searchPhrase))
             {
                 if (VideoSearchResults.Count > maxResults) break;
-
-                switch (result)
-                {
-                    case VideoSearchResult video:
-                    {
-                        VideoSearchResults.Add(new VideoData(video));
-                        break;
-                    }
-                    /*case PlaylistSearchResult playlist:
-                    {
-                        var id = playlist.Id;
-                        var title = playlist.Title;
-                        break;
-                    }
-                    case ChannelSearchResult channel:
-                    {
-                        var id = channel.Id;
-                        var title = channel.Title;
-                        break;
-                    }*/
-                }
-
+                VideoSearchResults.Add(new SearchResultBase(result));
                 ShowProgressBar = false;
             }
         }
@@ -196,17 +173,16 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             string? path = await OpenSaveDialog();
             if (string.IsNullOrEmpty(path)) return;
 
-            var videosOnly = selectedVideos.Where(v => v.IsLive == false).ToArray();
+            var videosOnly = selectedVideos.Where(v => v.Type == SearchResultBase.ResultType.Live).ToArray();
 
-            foreach (var video in videosOnly)
+            foreach (SearchResultBase video in videosOnly)
             {
                 downloadVideoInfos.Add(new DownloadVideoInfo(youtube, video.SearchResult.Title,
                     downloadVideoInfos));
             }
 
             if (downloadVideoInfos.Count == 0) return;
-
-
+            
             var arrayStreamSelectionDatas = await GetVideosSelectionDatasAsync(videosOnly);
 
             for (int i = 0; i < arrayStreamSelectionDatas.Length; i++)
@@ -229,20 +205,20 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                 (current, invalidChar) => current.Replace(invalidChar.ToString(), "_"));
         }
 
-        private async Task<StreamSelectionData[]> GetVideosSelectionDatasAsync(VideoData[] selection)
+        private async Task<StreamSelectionData[]> GetVideosSelectionDatasAsync(SearchResultBase[] selection)
         {
             var videoSelectionDatas = new List<StreamSelectionData>();
-            foreach (VideoData videoData in selection)
+            foreach (SearchResultBase searchResult in selection)
             {
                 try
                 {
-                    string? url = null;
+                    string url = "";
                     IStreamInfo streamInfo = null;
-                    if (videoData.IsLive)
-                        url = await youtube.Videos.Streams.GetHttpLiveStreamUrlAsync(videoData.SearchResult.Id);
+                    if (searchResult.Type == SearchResultBase.ResultType.Live)
+                        url = await youtube.Videos.Streams.GetHttpLiveStreamUrlAsync(searchResult.GetLiveID());
                     else
                     {
-                        var streamInfos = await GetStreamInfos(videoData.SearchResult.Url);
+                        var streamInfos = await GetStreamInfos(searchResult.SearchResult.Url);
 
                         streamInfo =
                             streamQuality.AudioOnly
@@ -251,7 +227,7 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
                         url = streamInfo.Url;
                     }
 
-                    var videoSelectionData = new StreamSelectionData(streamInfo, videoData.SearchResult.Title, url);
+                    var videoSelectionData = new StreamSelectionData(streamInfo, searchResult.SearchResult.Title, url);
                     videoSelectionDatas.Add(videoSelectionData);
                 }
                 catch (Exception e)
@@ -398,26 +374,23 @@ namespace YoutubeCrossPlatformPlayer.ViewModels
             }
         }
 
-        public class VideoData : ViewModelBase
-        {
-            public VideoSearchResult SearchResult { get; set; }
-            private string previewUrl { get; set; }
-
-            private bool isLive = true;
-
-            public bool IsLive
-            {
-                get { return isLive; }
-                set { this.RaiseAndSetIfChanged(ref isLive, value); }
-            }
-
-            public VideoData(VideoSearchResult searchResult)
-            {
-                SearchResult = searchResult;
-                previewUrl = (SearchResult.Thumbnails[2].Url);
-                IsLive = SearchResult.Duration == null;
-            }
-        }
+        // public class VideoData : SearchResultBase
+        // {
+        //     private bool isLive = true;
+        //
+        //     public bool IsLive
+        //     {
+        //         get { return isLive; }
+        //         set { this.RaiseAndSetIfChanged(ref isLive, value); }
+        //     }
+        //
+        //     public VideoData(ISearchResult searchResult) : base()
+        //     {
+        //         SearchResult = searchResult;
+        //         previewUrl = (SearchResult.t[2].Url);
+        //         IsLive = SearchResult.Duration == null;
+        //     }
+        // }
 
         public struct StreamSelectionData
         {

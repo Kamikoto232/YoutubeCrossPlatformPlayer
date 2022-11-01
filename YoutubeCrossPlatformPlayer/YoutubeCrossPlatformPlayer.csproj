@@ -8,7 +8,7 @@
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
-      <PlatformTarget>AnyCPU</PlatformTarget>
+      <PlatformTarget>x86</PlatformTarget>
       <Prefer32bit>true</Prefer32bit>
       <DebugType>none</DebugType>
     </PropertyGroup>
